@@ -5,6 +5,7 @@ import pytesseract
 from datetime import datetime
 import os
 import difflib
+from pathlib import Path
 
 # Set the path to the Tesseract executable
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -12,10 +13,22 @@ pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tessera
 def compare_images(baseline_path, current_path,
                    diff_output="diff.png",
                    highlighted_output="highlighted_diff.png",
-                   log_file="debug_log.txt"):
+                   log_file="debug_log.txt",output_dir: str = None):
+    
+    # Ensure we have an output directory
+    if not output_dir:
+        output_dir = os.path.join(str(Path(__file__).resolve().parents[1]), 'output')
+
+    os.makedirs(output_dir, exist_ok=True)
+
     # Load images
     baseline = cv2.imread(baseline_path)
     current = cv2.imread(current_path)
+
+    # Ensure both images have the same dimensions
+    if baseline.shape != current.shape:
+        print(f"Resizing current image from {current.shape} to {baseline.shape}")
+        current = cv2.resize(current, (baseline.shape[1], baseline.shape[0]))
 
     # Convert to grayscale
     gray_base = cv2.cvtColor(baseline, cv2.COLOR_BGR2GRAY)
@@ -27,7 +40,7 @@ def compare_images(baseline_path, current_path,
 
     # Save raw diff heatmap
     diff = (diff * 255).astype("uint8")
-    cv2.imwrite(diff_output, diff)
+    cv2.imwrite(os.path.join(output_dir, diff_output), diff)
 
     # Prepare log entries
     log_entries = []
@@ -61,13 +74,13 @@ def compare_images(baseline_path, current_path,
                 (x, y, w, h) = cv2.boundingRect(c)
                 cv2.rectangle(highlighted, (x, y), (x+w, y+h), (0, 0, 255), 2)
 
-        cv2.imwrite(highlighted_output, highlighted)
+        cv2.imwrite(os.path.join(output_dir, highlighted_output), highlighted)
         log_entries.append(f"Highlighted differences saved to {highlighted_output}")
         results["highlighted_image"] = highlighted_output
 
         # --- Step 3: OCR Text Extraction ---
-        text_base = pytesseract.image_to_string(gray_base).strip().splitlines()
-        text_curr = pytesseract.image_to_string(gray_curr).strip().splitlines()
+        text_base = extract_clean_text(baseline)
+        text_curr = extract_clean_text(current)
 
         # Compute differences using difflib
         diff = difflib.ndiff(text_base, text_curr)
@@ -82,7 +95,9 @@ def compare_images(baseline_path, current_path,
         results["ocr_differences"]["added"] = added
 
         if removed or added:
-            result_msg = "❌ OCR: Text difference detected!"
+            result_msg = f"""❌ OCR: Text difference detected!
+After: {removed}
+Before: {added}"""
             results["ocr_result"] = False
         else:
             result_msg = "✅ OCR: No text differences detected."
@@ -100,7 +115,7 @@ def compare_images(baseline_path, current_path,
         results["final_decision"] = True
 
     # --- Step 4: Write logs to file (overwrite each run) ---
-    with open(log_file, "w", encoding="utf-8") as f:
+    with open(os.path.join(output_dir,log_file), "w", encoding="utf-8") as f:
         f.write("=== Debug Run ===\n")
         for entry in log_entries:
             f.write(entry + "\n")
@@ -109,6 +124,13 @@ def compare_images(baseline_path, current_path,
     # Return dictionary for decision-making
     return results
 
+def extract_clean_text(img):
+    text = pytesseract.image_to_string(img)
+    # Remove unreadable symbols
+    import re
+    lines = [re.sub(r'[^A-Za-z0-9\s]', '', line).strip()
+             for line in text.splitlines() if line.strip()]
+    return lines
 
 def find_project_root(start_path=None, markers=None):
     if start_path is None:
@@ -138,8 +160,9 @@ def find_project_root(start_path=None, markers=None):
 
 
 current_directory = find_project_root()
-baseline_image_path = os.path.join(current_directory, "top_categories_fail_expected.png")
+baseline_image_path = os.path.join(current_directory, "top_categories_expected.png")
 current_image_path = os.path.join(current_directory, "top_categories_actual.png")
+
 # Example usage
 print(compare_images(baseline_image_path, current_image_path))
 

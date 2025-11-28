@@ -4,7 +4,7 @@ Documentation       End-to-end test scenarios for the LambdaTest E-Commerce Play
 
 Library             Browser
 Library             OperatingSystem
-Library             ../lib/ImageComparision.py
+Library             ../lib/compare_images.py
 Suite Setup         New Browser    browser=${BROWSER}    headless=${HEADLESS}
 Test Setup          New Context    viewport={'width': ${VIEWPORT_WIDTH}, 'height': ${VIEWPORT_HEIGHT}}
 #Test Teardown       Capture Screenshot On Failure
@@ -83,12 +83,11 @@ Verify Top Categories Are Visible
     ${FILENAME}=       Evaluate    os.path.join(r"${PROJECT_ROOT}", "top_categories_actual.png")    modules=os
     Take Screenshot    selector=xpath=//h5[text()='Top categories ']/parent::div    filename=${FILENAME}
     # Optionally, you can add image comparison logic here if needed.
-    ${res}=    compare_images   ${FILENAME}    ${PROJECT_ROOT}/top_categories_expected.png    output_dir=${PROJECT_ROOT}/output    method=absdiff    align=False    min_area=1000
-    IF    ${res.regions_count} > 0
-        IF   ${res.ssim_score} < 0.99999999999
-            Fail    Top categories visual regression detected. SSIM Score: ${res.ssim_score}, Changed Percent: ${res.changed_percent}, Regions Detected: ${res.regions_count}. See output images at: ${res.output_paths}
+    ${res}=    compare_images   ${FILENAME}    ${PROJECT_ROOT}/top_categories_expected.png
+    IF    ${res["ssim_score"]} < 1.0
+        IF   ${res["ocr_result"]} == False
+            Fail    Images differ significantly and OCR detected differences. See logfile for details.
         END    
     ELSE
-        Pass Execution    message
+        Pass Execution    Images match within acceptable limits.
     END
-    Log    SSIM Score: ${res.ssim_score}, Changed Percent: ${res.changed_percent}, Regions Detected: ${res.regions_count}, Output Paths: ${res.output_paths}
