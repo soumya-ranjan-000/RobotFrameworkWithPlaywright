@@ -1,0 +1,6 @@
+scikit-image
+robotframework-browser
+opencv-python
+numpy
+pytesseract
+Pillow
