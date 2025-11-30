@@ -4,3 +4,7 @@ opencv-python
 numpy
 pytesseract
 Pillow
+robotframework-pabot
+python-browserstack
+playwright
+browserstack-local

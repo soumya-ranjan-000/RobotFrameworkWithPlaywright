@@ -1,0 +1,11 @@
+{
+    "browserName": "chromium",
+    "browserVersion": "latest",
+    "platform": "Windows 10",
+    "LT:Options": {
+        "build": "Robot Framework Build",
+        "name": "Test Execution",
+        "video": true,
+        "network": true
+    }
+}
